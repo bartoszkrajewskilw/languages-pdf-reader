@@ -1,0 +1,495 @@
+:root {
+  --bg: #0f1216;
+  --panel: #171b21;
+  --panel-2: #1f242c;
+  --border: #2a313b;
+  --text: #e6e9ee;
+  --muted: #8b95a3;
+  --accent: #4f9dff;
+  --accent-2: #2f6fd0;
+  --danger: #e5534b;
+  --ok: #3fb950;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+}
+
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+/* ---- Top bar ---- */
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 8px 16px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+}
+.brand {
+  font-size: 18px;
+  font-weight: 700;
+  background: none;
+  border: none;
+  color: var(--text);
+  cursor: pointer;
+}
+.topnav {
+  display: flex;
+  gap: 4px;
+}
+.topnav button {
+  background: none;
+  border: none;
+  color: var(--muted);
+  padding: 6px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.topnav button:hover {
+  color: var(--text);
+  background: var(--panel-2);
+}
+.topnav button.active {
+  color: var(--text);
+  background: var(--panel-2);
+}
+.apikey-warn {
+  margin-left: auto;
+  color: #f0b429;
+  font-size: 13px;
+}
+
+.content {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* ---- Generic controls ---- */
+button {
+  font: inherit;
+  background: var(--panel-2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 12px;
+  cursor: pointer;
+}
+button:hover {
+  border-color: var(--accent-2);
+}
+button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+button.primary {
+  background: var(--accent-2);
+  border-color: var(--accent-2);
+  color: white;
+}
+button.primary:hover {
+  background: var(--accent);
+}
+button.danger {
+  color: var(--danger);
+}
+button.small {
+  padding: 3px 8px;
+  font-size: 12px;
+}
+button.link {
+  background: none;
+  border: none;
+  color: var(--accent);
+  padding: 0 4px;
+}
+button.tiny {
+  font-size: 12px;
+  padding: 0 4px;
+}
+input,
+select {
+  font: inherit;
+  background: var(--panel);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 8px;
+}
+input:focus,
+select:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 14px;
+  color: var(--muted);
+  margin-bottom: 12px;
+}
+label input,
+label select {
+  color: var(--text);
+}
+.row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.muted {
+  color: var(--muted);
+}
+.small {
+  font-size: 13px;
+}
+.tiny {
+  font-size: 11px;
+}
+.center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  height: 100%;
+}
+.error {
+  color: var(--danger);
+}
+.tag {
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 1px 8px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px;
+}
+
+/* ---- Library ---- */
+.library,
+.dictionary,
+.settings {
+  height: 100%;
+  overflow: auto;
+  padding: 24px;
+  max-width: 1100px;
+  margin: 0 auto;
+}
+.library-head,
+.dict-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.add-book {
+  margin: 16px 0;
+  max-width: 520px;
+}
+.book-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 16px;
+  margin-top: 16px;
+}
+.book-card {
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  transition: border-color 0.15s;
+}
+.book-card:hover {
+  border-color: var(--accent-2);
+}
+.book-card-title {
+  font-size: 16px;
+  font-weight: 600;
+}
+.book-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.book-card .danger {
+  align-self: flex-start;
+  margin-top: auto;
+}
+.button-like {
+  display: inline-block;
+  background: var(--accent-2);
+  color: white;
+  border-radius: 6px;
+  padding: 8px 14px;
+  cursor: pointer;
+}
+
+/* ---- Reader ---- */
+.reader {
+  height: 100%;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  min-height: 0;
+}
+.reader-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel);
+}
+.reader-head h2 {
+  margin: 0;
+  font-size: 16px;
+}
+.reader-body {
+  display: grid;
+  grid-template-columns: 1fr 360px;
+  min-height: 0;
+}
+.reader-pdf {
+  min-width: 0;
+  overflow: hidden;
+  display: flex;
+}
+.reader-panel {
+  border-left: 1px solid var(--border);
+  overflow: auto;
+  background: var(--panel);
+}
+.reader-audio {
+  border-top: 1px solid var(--border);
+  background: var(--panel);
+  padding: 8px 16px;
+}
+
+/* ---- PDF viewer ---- */
+.pdf {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+}
+.pdf-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+.page-input {
+  width: 56px;
+  text-align: center;
+}
+.hint {
+  margin-left: auto;
+  font-size: 12px;
+}
+.pdf-scroll {
+  flex: 1;
+  overflow: auto;
+  display: flex;
+  justify-content: center;
+  padding: 16px;
+  background: #0a0c0f;
+}
+.pdf-scroll .react-pdf__Page {
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.5);
+  height: max-content;
+}
+.empty-pdf {
+  width: 100%;
+}
+
+/* The whole PDF text layer is clickable; the exact word is resolved from the
+   caret position, so no per-word overlay boxes are needed (those misalign with
+   PDF.js's per-item scaling transforms). */
+.textLayer {
+  pointer-events: auto;
+}
+.textLayer .lw-item {
+  cursor: pointer;
+}
+
+/* ---- Audio ---- */
+.audio {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.audio-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.audio-select {
+  flex: 1;
+  min-width: 0;
+}
+.add-audio-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+  margin: 0;
+}
+.audio-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.audio-controls .play {
+  font-size: 16px;
+  width: 44px;
+}
+.audio-controls .seek {
+  flex: 1;
+}
+.audio-controls .time {
+  font-variant-numeric: tabular-nums;
+  font-size: 13px;
+}
+
+/* ---- Word panel ---- */
+.word-panel {
+  padding: 12px;
+}
+.word-panel h3 {
+  margin: 4px 0 12px;
+  font-size: 14px;
+}
+.word-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.word-item {
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--border);
+  border-radius: 8px;
+  padding: 10px;
+}
+.word-item.status-pending {
+  border-left-color: #f0b429;
+}
+.word-item.status-done {
+  border-left-color: var(--ok);
+}
+.word-item.status-error {
+  border-left-color: var(--danger);
+}
+.word-item-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.word-item .word {
+  font-weight: 700;
+  font-size: 15px;
+}
+.word-item .pos {
+  font-size: 11px;
+  color: var(--muted);
+  font-style: italic;
+}
+.word-item-head .link {
+  margin-left: auto;
+}
+.word-item .meaning {
+  margin-top: 4px;
+}
+.word-item .sentence {
+  margin-top: 6px;
+  color: var(--muted);
+  font-style: italic;
+}
+.word-item .sentence-trans {
+  margin-top: 2px;
+}
+
+/* ---- Dictionary ---- */
+.dict-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 12px;
+  font-size: 14px;
+}
+.dict-table th,
+.dict-table td {
+  text-align: left;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+.dict-table th {
+  color: var(--muted);
+  font-weight: 600;
+  position: sticky;
+  top: 0;
+  background: var(--bg);
+}
+.dict-table .pos {
+  font-size: 11px;
+  color: var(--muted);
+  font-style: italic;
+}
+.dict-table .sentence-cell {
+  max-width: 420px;
+  font-style: italic;
+  color: var(--muted);
+}
+.dict-table .actions {
+  white-space: nowrap;
+}
+.dict-table tr.status-pending td:first-child {
+  opacity: 0.7;
+}
+
+.settings .card {
+  max-width: 620px;
+  margin-bottom: 16px;
+}
+.settings h2 {
+  margin-top: 0;
+  font-size: 16px;
+}
