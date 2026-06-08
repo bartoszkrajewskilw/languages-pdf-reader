@@ -33,17 +33,14 @@ export interface Progress {
 }
 
 // A collected vocabulary item: the word, the sentence it came from (context),
-// and the AI's contextual explanation.
+// and the AI's one-word translation of the word in that context.
 export interface Entry {
   id?: number;
   bookId: number;
   word: string;
   sentence: string;
-  // AI output (filled in asynchronously; may be empty until translated).
-  baseForm: string;
-  partOfSpeech: string;
+  // The translation (filled in asynchronously; empty until translated).
   meaning: string;
-  sentenceTranslation: string;
   status: 'pending' | 'done' | 'error';
   error?: string;
   createdAt: number;

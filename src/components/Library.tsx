@@ -1,15 +1,18 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, createBook, deleteBook, addFile, replacePdf } from '../db';
+import { useWords, removeWordsForBook } from '../words';
 import { loadSettings } from '../settings';
+import type { Book } from '../types';
+import { HeadphonesIcon, FileTextIcon, BookIcon, TrashIcon, PlusIcon } from './icons';
 
 export default function Library({ onOpenBook }: { onOpenBook: (bookId: number) => void }) {
   const [adding, setAdding] = useState(false);
   const [title, setTitle] = useState('');
-  const [sourceLang, setSourceLang] = useState('');
   const [pdf, setPdf] = useState<File | null>(null);
   const [audios, setAudios] = useState<File[]>([]);
   const [busy, setBusy] = useState(false);
+  const [confirmBook, setConfirmBook] = useState<Book | null>(null);
 
   const books = useLiveQuery(() => db.books.orderBy('createdAt').reverse().toArray(), []);
   const fileCounts = useLiveQuery(async () => {
@@ -21,18 +24,18 @@ export default function Library({ onOpenBook }: { onOpenBook: (bookId: number) =
     }
     return counts;
   }, []);
-  const wordCounts = useLiveQuery(async () => {
-    const all = await db.entries.toArray();
+  const words = useWords();
+  const wordCounts = useMemo(() => {
     const counts: Record<number, number> = {};
-    for (const e of all) counts[e.bookId] = (counts[e.bookId] ?? 0) + 1;
+    for (const e of words) counts[e.bookId] = (counts[e.bookId] ?? 0) + 1;
     return counts;
-  }, []);
+  }, [words]);
 
   async function submit() {
     if (busy) return;
     setBusy(true);
     try {
-      const bookId = await createBook(title, sourceLang, loadSettings().defaultTargetLang);
+      const bookId = await createBook(title, '', loadSettings().defaultTargetLang);
       if (pdf) await replacePdf(bookId, pdf);
       for (const a of audios) await addFile(bookId, 'audio', a);
       resetForm();
@@ -45,14 +48,8 @@ export default function Library({ onOpenBook }: { onOpenBook: (bookId: number) =
   function resetForm() {
     setAdding(false);
     setTitle('');
-    setSourceLang('');
     setPdf(null);
     setAudios([]);
-  }
-
-  async function remove(bookId: number, bookTitle: string) {
-    if (!confirm(`Delete "${bookTitle}" and all its files and collected words?`)) return;
-    await deleteBook(bookId);
   }
 
   return (
@@ -61,7 +58,8 @@ export default function Library({ onOpenBook }: { onOpenBook: (bookId: number) =
         <h1>Your books</h1>
         {!adding && (
           <button className="primary" onClick={() => setAdding(true)}>
-            + Add book
+            <PlusIcon size={16} />
+            Add book
           </button>
         )}
       </div>
@@ -75,15 +73,7 @@ export default function Library({ onOpenBook }: { onOpenBook: (bookId: number) =
               autoFocus
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="e.g. Harry Potter — German"
-            />
-          </label>
-          <label>
-            Language being learned (optional — left empty = auto-detect)
-            <input
-              value={sourceLang}
-              onChange={(e) => setSourceLang(e.target.value)}
-              placeholder="e.g. German, Deutsch, fr…"
+              placeholder="e.g. Harry Potter"
             />
           </label>
           <label>
@@ -114,31 +104,74 @@ export default function Library({ onOpenBook }: { onOpenBook: (bookId: number) =
         </div>
       )}
 
-      <div className="book-grid">
-        {books?.length === 0 && !adding && (
+      {books?.length === 0 && !adding && (
+        <div className="library-empty">
+          <BookIcon size={32} />
           <p className="muted">No books yet. Click “Add book” to get started.</p>
-        )}
-        {books?.map((b) => (
-          <div key={b.id} className="book-card card" onClick={() => onOpenBook(b.id!)}>
-            <div className="book-card-title">{b.title}</div>
-            <div className="book-card-meta">
-              {b.sourceLang && <span className="tag">{b.sourceLang}</span>}
-              <span>{fileCounts?.[b.id!]?.audio ?? 0} audio</span>
-              <span>{fileCounts?.[b.id!]?.pdf ? 'PDF ✓' : 'no PDF'}</span>
-              <span>{wordCounts?.[b.id!] ?? 0} words</span>
+        </div>
+      )}
+
+      <div className="book-grid">
+        {books?.map((b) => {
+          const audio = fileCounts?.[b.id!]?.audio ?? 0;
+          const hasPdf = !!fileCounts?.[b.id!]?.pdf;
+          const words = wordCounts?.[b.id!] ?? 0;
+          return (
+            <div key={b.id} className="book-card" onClick={() => onOpenBook(b.id!)}>
+              <button
+                className="book-delete"
+                title="Delete book"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setConfirmBook(b);
+                }}
+              >
+                <TrashIcon size={16} />
+              </button>
+              <div className="book-card-title">{b.title}</div>
+              <div className="book-card-meta">
+                <span>
+                  <HeadphonesIcon size={14} />
+                  {audio} {audio === 1 ? 'chapter' : 'chapters'}
+                </span>
+                <span>
+                  <BookIcon size={14} />
+                  {words} {words === 1 ? 'word' : 'words'}
+                </span>
+                <span className={hasPdf ? 'ok' : 'muted'}>
+                  <FileTextIcon size={14} />
+                  {hasPdf ? 'PDF' : 'No PDF'}
+                </span>
+              </div>
             </div>
-            <button
-              className="danger small"
-              onClick={(e) => {
-                e.stopPropagation();
-                remove(b.id!, b.title);
-              }}
-            >
-              Delete
-            </button>
-          </div>
-        ))}
+          );
+        })}
       </div>
+
+      {confirmBook && (
+        <div className="modal-overlay" onClick={() => setConfirmBook(null)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <h3>Delete book?</h3>
+            <p className="muted">
+              “{confirmBook.title}” and all its files and collected words will be permanently
+              deleted.
+            </p>
+            <div className="row modal-actions">
+              <button
+                className="danger"
+                onClick={async () => {
+                  await deleteBook(confirmBook.id!);
+                  removeWordsForBook(confirmBook.id!);
+                  setConfirmBook(null);
+                }}
+              >
+                Delete
+              </button>
+              <button onClick={() => setConfirmBook(null)}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

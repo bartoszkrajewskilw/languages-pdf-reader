@@ -5,3 +5,6 @@ test-assets
 .DS_Store
 .vite
 *.tsbuildinfo
+data/
+.env
+.env.local

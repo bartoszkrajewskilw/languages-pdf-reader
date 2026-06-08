@@ -1,6 +1,8 @@
 import { useMemo, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { db, deleteEntry, updateEntry } from '../db';
+import { db } from '../db';
+import { useWords, getWord, updateWord, removeWord } from '../words';
+import HighlightedSentence from './HighlightedSentence';
 import { translateWord } from '../ai';
 import type { Settings } from '../settings';
 
@@ -11,10 +13,7 @@ export default function Dictionary({ settings }: { settings: Settings }) {
   const [query, setQuery] = useState('');
 
   const books = useLiveQuery(() => db.books.toArray(), []);
-  const entries = useLiveQuery(
-    () => db.entries.orderBy('createdAt').reverse().toArray(),
-    [],
-  );
+  const all = useWords();
 
   const bookTitles = useMemo(() => {
     const map = new Map<number, string>();
@@ -23,7 +22,7 @@ export default function Dictionary({ settings }: { settings: Settings }) {
   }, [books]);
 
   const filtered = useMemo(() => {
-    let list = entries ?? [];
+    let list = [...all].sort((a, b) => b.createdAt - a.createdAt);
     if (bookFilter !== 'all') list = list.filter((e) => e.bookId === bookFilter);
     const q = query.trim().toLowerCase();
     if (q) {
@@ -35,31 +34,28 @@ export default function Dictionary({ settings }: { settings: Settings }) {
       );
     }
     return list;
-  }, [entries, bookFilter, query]);
+  }, [all, bookFilter, query]);
 
   async function retranslate(id: number) {
-    const e = await db.entries.get(id);
+    const e = getWord(id);
     if (!e) return;
     const book = await db.books.get(e.bookId);
-    await updateEntry(id, { status: 'pending', error: undefined });
+    updateWord(id, { status: 'pending', error: undefined });
     try {
-      const t = await translateWord(e.word, e.sentence, book?.sourceLang ?? '', settings);
-      await updateEntry(id, { ...t, status: 'done', error: undefined });
+      const meaning = await translateWord(e.word, e.sentence, book?.sourceLang ?? '', settings);
+      updateWord(id, { meaning, status: 'done', error: undefined });
     } catch (err) {
-      await updateEntry(id, { status: 'error', error: (err as Error).message });
+      updateWord(id, { status: 'error', error: (err as Error).message });
     }
   }
 
   function exportCsv() {
     const rows = [
-      ['word', 'baseForm', 'partOfSpeech', 'meaning', 'sentence', 'sentenceTranslation', 'book'],
+      ['word', 'meaning', 'sentence', 'book'],
       ...filtered.map((e) => [
         e.word,
-        e.baseForm,
-        e.partOfSpeech,
         e.meaning,
         e.sentence,
-        e.sentenceTranslation,
         bookTitles.get(e.bookId) ?? '',
       ]),
     ];
@@ -110,7 +106,7 @@ export default function Dictionary({ settings }: { settings: Settings }) {
         <thead>
           <tr>
             <th>Word</th>
-            <th>Meaning (in context)</th>
+            <th>Translation</th>
             <th>Sentence</th>
             <th>Book</th>
             <th></th>
@@ -121,10 +117,6 @@ export default function Dictionary({ settings }: { settings: Settings }) {
             <tr key={e.id} className={`status-${e.status}`}>
               <td>
                 <strong>{e.word}</strong>
-                {e.partOfSpeech && <div className="pos">{e.partOfSpeech}</div>}
-                {e.baseForm && e.baseForm !== e.word && (
-                  <div className="muted tiny">{e.baseForm}</div>
-                )}
               </td>
               <td>
                 {e.status === 'pending' && <span className="muted">Translating…</span>}
@@ -132,17 +124,14 @@ export default function Dictionary({ settings }: { settings: Settings }) {
                 {e.meaning}
               </td>
               <td className="sentence-cell">
-                “{e.sentence}”
-                {e.sentenceTranslation && (
-                  <div className="muted small">{e.sentenceTranslation}</div>
-                )}
+                “<HighlightedSentence text={e.sentence} word={e.word} />”
               </td>
               <td className="muted small">{bookTitles.get(e.bookId) ?? '—'}</td>
               <td className="actions">
                 <button className="link tiny" onClick={() => retranslate(e.id!)}>
                   ⟳
                 </button>
-                <button className="link tiny" onClick={() => deleteEntry(e.id!)}>
+                <button className="link tiny" onClick={() => removeWord(e.id!)}>
                   ✕
                 </button>
               </td>

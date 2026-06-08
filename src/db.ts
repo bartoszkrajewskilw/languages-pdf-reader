@@ -39,9 +39,9 @@ export async function createBook(
 }
 
 export async function deleteBook(bookId: number): Promise<void> {
-  await db.transaction('rw', db.books, db.files, db.progress, db.entries, async () => {
+  // Collected words live in data/words.json (see src/words.ts), removed separately.
+  await db.transaction('rw', db.books, db.files, db.progress, async () => {
     await db.files.where('bookId').equals(bookId).delete();
-    await db.entries.where('bookId').equals(bookId).delete();
     await db.progress.where('bookId').equals(bookId).delete();
     await db.books.delete(bookId);
   });
@@ -94,18 +94,4 @@ export async function getProgress(bookId: number): Promise<Progress> {
 
 export async function saveProgress(progress: Progress): Promise<void> {
   await db.progress.put({ ...progress, updatedAt: Date.now() });
-}
-
-// ---- Dictionary entries ---------------------------------------------------
-
-export async function addEntry(entry: Omit<Entry, 'id'>): Promise<number> {
-  return db.entries.add(entry as Entry);
-}
-
-export async function updateEntry(id: number, patch: Partial<Entry>): Promise<void> {
-  await db.entries.update(id, patch);
-}
-
-export async function deleteEntry(id: number): Promise<void> {
-  await db.entries.delete(id);
 }

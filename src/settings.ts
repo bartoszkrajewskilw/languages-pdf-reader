@@ -1,5 +1,6 @@
-// App-wide settings stored in localStorage (small, non-file config only).
-// The Claude API key lives here so it stays on this device and is easy to clear.
+// App-wide settings. The OpenAI API key comes from a local .env file
+// (VITE_OPENAI_API_KEY, gitignored) — never typed into the UI or stored in the
+// browser. The model and native language are small prefs kept in localStorage.
 
 export interface Settings {
   apiKey: string;
@@ -8,30 +9,35 @@ export interface Settings {
   defaultTargetLang: string;
 }
 
-const KEY = 'languages-pdf-reader.settings';
+const KEY = "languages-pdf-reader.settings";
+const ENV_API_KEY = (import.meta.env.VITE_OPENAI_API_KEY ?? "").trim();
 
-export const MODEL_OPTIONS = [
-  { id: 'claude-haiku-4-5-20251001', label: 'Claude Haiku 4.5 (fast, cheap — recommended)' },
-  { id: 'claude-sonnet-4-6', label: 'Claude Sonnet 4.6 (more nuanced)' },
-  { id: 'claude-opus-4-8', label: 'Claude Opus 4.8 (most capable)' },
-];
-
-const DEFAULTS: Settings = {
-  apiKey: '',
-  model: MODEL_OPTIONS[0].id,
-  defaultTargetLang: 'Polski',
+const DEFAULTS = {
+  model: "gpt-5.5",
+  defaultTargetLang: "Polski",
 };
 
 export function loadSettings(): Settings {
+  let stored: Partial<Settings> = {};
   try {
     const raw = localStorage.getItem(KEY);
-    if (!raw) return { ...DEFAULTS };
-    return { ...DEFAULTS, ...(JSON.parse(raw) as Partial<Settings>) };
+    if (raw) stored = JSON.parse(raw) as Partial<Settings>;
   } catch {
-    return { ...DEFAULTS };
+    /* ignore corrupt storage */
   }
+  let model = stored.model || DEFAULTS.model;
+  if (model.startsWith("claude")) model = DEFAULTS.model; // migrate old configs
+  return {
+    apiKey: ENV_API_KEY, // always from .env
+    model,
+    defaultTargetLang: stored.defaultTargetLang || DEFAULTS.defaultTargetLang,
+  };
 }
 
 export function saveSettings(s: Settings): void {
-  localStorage.setItem(KEY, JSON.stringify(s));
+  // apiKey is sourced from .env, never persisted here.
+  localStorage.setItem(
+    KEY,
+    JSON.stringify({ model: s.model, defaultTargetLang: s.defaultTargetLang }),
+  );
 }

@@ -80,6 +80,7 @@ export function findWordAndSentence(text: string, offset: number): WordContext |
 // are letters/punctuation that are kept; only quotes and whitespace are stripped.
 function trimSentence(s: string): string {
   return s
+    .replace(/\s+/g, ' ') // collapse runs of whitespace (justified text / page joins)
     .trim()
     .replace(/^["“”«»„‚\s]+/u, '')
     .replace(/["“”«»„‚\s]+$/u, '')
