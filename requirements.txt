@@ -1,0 +1,3 @@
+# Local, free audio→text alignment for the "jump PDF to audio position" feature.
+# Install once:  python3 -m pip install -r requirements.txt
+faster-whisper>=1.2

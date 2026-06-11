@@ -10,6 +10,9 @@ Built from the design conversation in the project brief. The pain point it solve
 no more juggling a PDF in one app, audio in another, and notes in a third — clicking a
 word never interrupts your audio or hides your page.
 
+> **Architecture, storage, and the path to a real product** are documented in
+> [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — read it before bigger changes.
+
 ## Features
 
 - **Library** of books. Each book has one PDF and any number of audio files (chapters).

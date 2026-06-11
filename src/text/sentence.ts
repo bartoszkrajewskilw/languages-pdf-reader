@@ -76,6 +76,51 @@ export function findWordAndSentence(text: string, offset: number): WordContext |
   return { word, sentence };
 }
 
+// The [start, end) char range of the sentence containing `offset` within `text`,
+// trimmed of bracketing whitespace/quotes. Used to highlight the whole sentence the
+// audio landed on. Returns null if no word is near the offset.
+const TRIM_CHAR = /[\s"“”«»„‚]/u;
+export function sentenceRange(
+  text: string,
+  offset: number,
+): { start: number; end: number } | null {
+  if (text.length === 0) return null;
+  let o = Math.max(0, Math.min(offset, text.length - 1));
+  // If the offset isn't on a word, snap to the nearest word character.
+  if (!isWordPart(text[o], text, o)) {
+    let f = o;
+    while (f < text.length && !isWordPart(text[f], text, f)) f++;
+    let b = o;
+    while (b >= 0 && !isWordPart(text[b], text, b)) b--;
+    if (f < text.length && (b < 0 || f - o <= o - b)) o = f;
+    else if (b >= 0) o = b;
+    else return null;
+  }
+
+  let wStart = o;
+  while (wStart > 0 && isWordPart(text[wStart - 1], text, wStart - 1)) wStart--;
+  let wEnd = o;
+  while (wEnd < text.length - 1 && isWordPart(text[wEnd + 1], text, wEnd + 1)) wEnd++;
+
+  let sStart = wStart;
+  while (sStart > 0) {
+    const ch = text[sStart - 1];
+    if (TERMINATORS.has(ch) || SOFT_BOUNDARY.has(ch)) break;
+    sStart--;
+  }
+  let sEnd = wEnd;
+  while (sEnd < text.length - 1) {
+    const next = text[sEnd + 1];
+    if (SOFT_BOUNDARY.has(next)) break;
+    sEnd++;
+    if (TERMINATORS.has(next)) break;
+  }
+
+  while (sStart < sEnd && TRIM_CHAR.test(text[sStart])) sStart++;
+  while (sEnd > sStart && TRIM_CHAR.test(text[sEnd])) sEnd--;
+  return { start: sStart, end: sEnd + 1 };
+}
+
 // Trim whitespace and stray quote characters that bracket a sentence. Terminators
 // are letters/punctuation that are kept; only quotes and whitespace are stripped.
 function trimSentence(s: string): string {

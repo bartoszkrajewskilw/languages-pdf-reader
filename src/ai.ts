@@ -17,7 +17,7 @@ export async function translateWord(
 
   const prompt =
     `Co oznacza słowo „${word}" w zdaniu „${sentence}"? ` +
-    `Odpowiedz jednym lub dwoma słowami, bez wyjaśnień.`;
+    `Odpowiedź ma zawierać wyłącznie samo znaczenie. Nie pisz pełnym zdaniem. Nie tłumacz całego cytatu.`;
 
   const res = await fetch(API_URL, {
     method: "POST",

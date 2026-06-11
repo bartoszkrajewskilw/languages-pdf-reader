@@ -44,4 +44,8 @@ export interface Entry {
   status: 'pending' | 'done' | 'error';
   error?: string;
   createdAt: number;
+  // Where the word sits in the book, for "in book" sorting: page * PAGE_SCALE +
+  // char offset within the page (see bookPosition()). Recorded at collection time;
+  // optional because words collected before this existed are backfilled lazily.
+  position?: number;
 }

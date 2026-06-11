@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { findWordAndSentence } from './sentence';
+import { findWordAndSentence, sentenceRange } from './sentence';
 
 describe('findWordAndSentence', () => {
   it('extracts a word in the middle of a sentence', () => {
@@ -78,5 +78,30 @@ describe('findWordAndSentence', () => {
     const offset = text.indexOf('wunderbares') + 4;
     const res = findWordAndSentence(text, offset);
     expect(res!.word).toBe('wunderbares');
+  });
+});
+
+describe('sentenceRange', () => {
+  const text = 'First sentence here. The dog ran across the field. Last one now.';
+
+  it('returns the whole sentence containing the offset', () => {
+    const r = sentenceRange(text, text.indexOf('ran'))!;
+    expect(text.slice(r.start, r.end)).toBe('The dog ran across the field.');
+  });
+
+  it('works when the landed word is the last word of the sentence', () => {
+    const r = sentenceRange(text, text.indexOf('field'))!;
+    expect(text.slice(r.start, r.end)).toBe('The dog ran across the field.');
+  });
+
+  it('trims leading quotes and whitespace from the range', () => {
+    const q = 'He said, “Get the wand now.” Then he left.';
+    const r = sentenceRange(q, q.indexOf('wand'))!;
+    expect(q.slice(r.start, r.end)).toBe('Get the wand now.');
+  });
+
+  it('snaps to the nearest word when the offset is on whitespace', () => {
+    const r = sentenceRange(text, text.indexOf(' ran') )!;
+    expect(text.slice(r.start, r.end)).toBe('The dog ran across the field.');
   });
 });

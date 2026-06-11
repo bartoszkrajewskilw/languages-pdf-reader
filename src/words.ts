@@ -86,6 +86,17 @@ export function updateWord(id: number, patch: Partial<Entry>): void {
   scheduleSave();
 }
 
+// Apply many patches at once (one re-render, one save) — used to backfill book
+// positions for words collected before positions were recorded.
+export function updateWords(patches: Map<number, Partial<Entry>>): void {
+  if (patches.size === 0) return;
+  entries = entries.map((e) =>
+    e.id != null && patches.has(e.id) ? { ...e, ...patches.get(e.id) } : e,
+  );
+  emit();
+  scheduleSave();
+}
+
 export function removeWord(id: number): void {
   entries = entries.filter((e) => e.id !== id);
   emit();

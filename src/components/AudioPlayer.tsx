@@ -1,11 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import type { StoredFile } from '../types';
+import { JumpIcon } from './icons';
 
 interface Props {
   files: StoredFile[];
   selectedFileId: number | null;
   initialPosition: number;
   onPosition: (fileId: number, seconds: number) => void;
+  onLocate: (seconds: number) => void;
+  locating: boolean;
 }
 
 function fmt(t: number): string {
@@ -15,7 +18,14 @@ function fmt(t: number): string {
   return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
-export default function AudioPlayer({ files, selectedFileId, initialPosition, onPosition }: Props) {
+export default function AudioPlayer({
+  files,
+  selectedFileId,
+  initialPosition,
+  onPosition,
+  onLocate,
+  locating,
+}: Props) {
   const audioRef = useRef<HTMLAudioElement>(null);
   const [url, setUrl] = useState<string | null>(null);
   const [playing, setPlaying] = useState(false);
@@ -92,10 +102,27 @@ export default function AudioPlayer({ files, selectedFileId, initialPosition, on
     return () => window.removeEventListener('keydown', onKey);
   }, []);
 
+  function jumpToAudio() {
+    const a = audioRef.current;
+    if (a) onLocate(a.currentTime);
+  }
+
   return (
     <div className="audio">
-      <div className="audio-now" title={selected?.name}>
-        {selected ? selected.name : 'No chapter selected — choose one in the sidebar'}
+      <div className="audio-now">
+        <span className="audio-now-name" title={selected?.name}>
+          {selected ? selected.name : 'No chapter selected — choose one in the sidebar'}
+        </span>
+        {url && (
+          <button
+            className="audio-jump"
+            onClick={jumpToAudio}
+            disabled={locating}
+            title="Jump PDF to where the audio is now"
+          >
+            {locating ? <span className="spinner" /> : <JumpIcon size={17} />}
+          </button>
+        )}
       </div>
 
       {url && (

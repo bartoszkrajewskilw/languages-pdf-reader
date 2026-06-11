@@ -8,16 +8,13 @@ import {
   type MouseEvent,
 } from 'react';
 import { Document, Page } from 'react-pdf';
-import { findWordAndSentence, type WordContext } from '../text/sentence';
+import { findWordAndSentence, sentenceRange, type WordContext } from '../text/sentence';
+import { buildPageText, type RawItem, type PageText } from '../text/pageText';
+import { bookPosition } from '../align/bookText';
 
 // Derive the document type from react-pdf's own callback so it always matches
 // the pdfjs-dist copy react-pdf actually uses (avoids dual-package type clashes).
 type PDFDoc = Parameters<NonNullable<ComponentProps<typeof Document>['onLoadSuccess']>>[0];
-
-interface PageText {
-  full: string;
-  offsets: Map<number, number>; // text-item index -> start char offset in `full`
-}
 
 interface Props {
   blob: Blob;
@@ -25,7 +22,10 @@ interface Props {
   scale: number;
   onNumPages: (n: number) => void;
   onPageChange: (page: number) => void;
-  onCollect: (ctx: WordContext) => void;
+  onCollect: (ctx: WordContext, position: number) => void;
+  // A spot to briefly highlight (e.g. where the audio landed). `offset` is the
+  // char offset within that page's reconstructed text; `nonce` retriggers it.
+  highlight: { page: number; offset: number; nonce: number } | null;
 }
 
 const WORD_CHAR = /[\p{L}\p{N}'’\-]/u;
@@ -42,81 +42,6 @@ function escapeHtml(s: string): string {
 }
 
 const clamp = (n: number, lo: number, hi: number) => Math.min(Math.max(n, lo), hi);
-
-type RawItem = { str?: string; transform?: number[]; height?: number };
-
-function median(nums: number[]): number {
-  if (!nums.length) return 0;
-  const s = [...nums].sort((a, b) => a - b);
-  return s[Math.floor(s.length / 2)];
-}
-
-// Reconstruct a page's text + per-item offsets, with two refinements:
-//  - the running header/footer (chapter title + page number bands, set off from
-//    the body by extra whitespace) is dropped, so it never leaks into a sentence;
-//  - wrapped lines join with a space (sentences flow across them) while a large
-//    vertical gap (paragraph/heading break) becomes a newline.
-function buildPageText(items: RawItem[]): PageText {
-  type It = { i: number; str: string; y: number; h: number };
-  const its: It[] = [];
-  items.forEach((item, i) => {
-    if (typeof item.str === 'string' && item.transform) {
-      its.push({ i, str: item.str, y: item.transform[5], h: item.height ?? 0 });
-    }
-  });
-  if (!its.length) return { full: '', offsets: new Map() };
-
-  // Cluster items into lines by their y position (top → bottom).
-  const medH = median(its.map((t) => t.h).filter((h) => h > 0)) || 12;
-  const tol = Math.max(2, medH * 0.6);
-  const lineYs: number[] = [];
-  for (const t of [...its].sort((a, b) => b.y - a.y)) {
-    const last = lineYs[lineYs.length - 1];
-    if (last == null || Math.abs(last - t.y) > tol) lineYs.push(t.y);
-  }
-  const lineOf = (y: number) => {
-    let best = 0;
-    let bestD = Infinity;
-    for (let k = 0; k < lineYs.length; k++) {
-      const d = Math.abs(lineYs[k] - y);
-      if (d < bestD) {
-        bestD = d;
-        best = k;
-      }
-    }
-    return best;
-  };
-
-  const lineGaps: number[] = [];
-  for (let k = 1; k < lineYs.length; k++) lineGaps.push(lineYs[k - 1] - lineYs[k]);
-  const medGap = median(lineGaps);
-  const headFootThr = medGap > 0 ? medGap * 1.5 : Infinity;
-  const paraThr = medGap > 0 ? medGap * 1.6 : Infinity;
-
-  // Drop the top line as a header and/or the bottom line as a footer when it is
-  // detached from the body by a clearly larger-than-normal gap.
-  const drop = new Set<number>();
-  const n = lineYs.length;
-  if (n >= 3) {
-    if (lineYs[0] - lineYs[1] > headFootThr) drop.add(0);
-    if (lineYs[n - 2] - lineYs[n - 1] > headFootThr) drop.add(n - 1);
-  }
-
-  let full = '';
-  let prevY: number | null = null;
-  const offsets = new Map<number, number>();
-  for (const t of its) {
-    if (drop.has(lineOf(t.y))) continue;
-    if (full.length > 0) {
-      const dy = prevY == null ? 0 : prevY - t.y;
-      full += dy > paraThr ? '\n' : ' ';
-    }
-    offsets.set(t.i, full.length);
-    full += t.str;
-    prevY = t.y;
-  }
-  return { full, offsets };
-}
 
 // Resolve the text node + character offset under a screen point, so we can find
 // the exact clicked word from the natively-rendered text.
@@ -143,6 +68,7 @@ export default function PdfViewer({
   onNumPages,
   onPageChange,
   onCollect,
+  highlight,
 }: Props) {
   const [pdfDoc, setPdfDoc] = useState<PDFDoc | null>(null);
   const [numPages, setNumPages] = useState(0);
@@ -157,6 +83,10 @@ export default function PdfViewer({
   const scrollRef = useRef<HTMLDivElement>(null);
   const currentRef = useRef(page);
   const rafRef = useRef(0);
+  // Transient "where the audio landed" highlight overlays + their timers.
+  const hlRaf = useRef(0);
+  const hlTimer = useRef(0);
+  const hlEls = useRef<HTMLElement[]>([]);
 
   const file = useMemo(() => blob, [blob]);
   const renderWidth = Math.round(width * scale);
@@ -331,6 +261,130 @@ export default function PdfViewer({
     window.setTimeout(() => sel.removeAllRanges(), 700);
   }
 
+  // Briefly mark where the audio landed: find the sentence containing the given
+  // in-page offset, scroll it to the middle, and pulse a highlight over the whole
+  // sentence (which may wrap across several rendered lines).
+  useEffect(() => {
+    if (!highlight || !ready) return;
+    const { page: hp, offset } = highlight;
+
+    const clear = () => {
+      if (hlRaf.current) clearTimeout(hlRaf.current);
+      if (hlTimer.current) clearTimeout(hlTimer.current);
+      hlRaf.current = 0;
+      hlTimer.current = 0;
+      hlEls.current.forEach((el) => el.remove());
+      hlEls.current = [];
+    };
+    clear();
+
+    let attempts = 0;
+    const tick = () => {
+      attempts++;
+      const scroller = scrollRef.current;
+      const slot = scroller?.querySelector(
+        `.pdf-page-slot[data-page="${hp}"]`,
+      ) as HTMLElement | null;
+      const pt = pageTextsRef.current.get(hp);
+      const spans = slot
+        ? (Array.from(slot.querySelectorAll('.lw-item[data-start]')) as HTMLElement[])
+        : [];
+
+      if (scroller && slot && pt && spans.length) {
+        // Span text nodes in reading order, with their char offset into pt.full.
+        const infos = spans
+          .map((el) => ({
+            start: Number(el.dataset.start),
+            node: el.firstChild,
+            len: el.firstChild?.textContent?.length ?? 0,
+          }))
+          .filter(
+            (s) => s.node != null && s.node.nodeType === Node.TEXT_NODE && !Number.isNaN(s.start),
+          )
+          .sort((a, b) => a.start - b.start) as {
+          start: number;
+          node: Node;
+          len: number;
+        }[];
+
+        // The sentence containing the landed word, as a char range in pt.full.
+        const sr = sentenceRange(pt.full, offset) ?? { start: offset, end: offset + 1 };
+
+        // Map a char position to (text node, local offset). `atEnd` resolves the
+        // exclusive end boundary (the point just after char `pos - 1`).
+        const point = (pos: number, atEnd: boolean) => {
+          const c = atEnd ? pos - 1 : pos;
+          for (let i = 0; i < infos.length; i++) {
+            const sp = infos[i];
+            if (c < sp.start) {
+              if (atEnd) {
+                const prev = infos[i - 1] ?? sp;
+                return { node: prev.node, local: i === 0 ? 0 : prev.len };
+              }
+              return { node: sp.node, local: 0 };
+            }
+            if (c < sp.start + sp.len) {
+              return { node: sp.node, local: c - sp.start + (atEnd ? 1 : 0) };
+            }
+          }
+          const last = infos[infos.length - 1];
+          return { node: last.node, local: last.len };
+        };
+
+        if (infos.length) {
+          const a = point(sr.start, false);
+          const b = point(sr.end, true);
+          const range = document.createRange();
+          range.setStart(a.node, clamp(a.local, 0, a.node.textContent?.length ?? 0));
+          range.setEnd(b.node, clamp(b.local, 0, b.node.textContent?.length ?? 0));
+          if (range.collapsed) range.selectNode(a.node);
+
+          // Center the viewport on the actual landed WORD (not the sentence's
+          // bounding box) — the audio is at that word, and centering the whole
+          // sentence would sit a line or two off for a multi-line sentence.
+          const scRect = scroller.getBoundingClientRect();
+          const wp = point(offset, false);
+          const wtext = wp.node.textContent ?? '';
+          let ws = clamp(wp.local, 0, wtext.length);
+          let we = ws;
+          while (ws > 0 && WORD_CHAR.test(wtext[ws - 1])) ws--;
+          while (we < wtext.length && WORD_CHAR.test(wtext[we])) we++;
+          if (ws === we) we = Math.min(wtext.length, ws + 1);
+          const wordRange = document.createRange();
+          wordRange.setStart(wp.node, ws);
+          wordRange.setEnd(wp.node, we);
+          const wbr = wordRange.getBoundingClientRect();
+          const top =
+            wbr.top + wbr.height / 2 - scRect.top + scroller.scrollTop - scroller.clientHeight / 2;
+          // Instant, not smooth: a smooth animation here gets interrupted by the
+          // viewer's own scroll/recompute cycle during a page jump and lands short.
+          scroller.scrollTop = Math.max(0, top);
+
+          // One pulse rect per line of the sentence, anchored to the page slot.
+          const slotRect = slot.getBoundingClientRect();
+          for (const rc of Array.from(range.getClientRects())) {
+            if (rc.width < 1 || rc.height < 1) continue;
+            const d = document.createElement('div');
+            d.className = 'lw-flash';
+            d.style.left = `${rc.left - slotRect.left}px`;
+            d.style.top = `${rc.top - slotRect.top}px`;
+            d.style.width = `${rc.width}px`;
+            d.style.height = `${rc.height}px`;
+            slot.appendChild(d);
+            hlEls.current.push(d);
+          }
+          hlTimer.current = window.setTimeout(clear, 2600);
+          return; // done
+        }
+      }
+      // setTimeout (not rAF) so the marker still renders if the tab was
+      // backgrounded while the transcription ran.
+      if (attempts < 250) hlRaf.current = window.setTimeout(tick, 50);
+    };
+    hlRaf.current = window.setTimeout(tick, 50);
+    return clear;
+  }, [highlight, ready]);
+
   function handleClick(e: MouseEvent) {
     const caret = caretFromPoint(e.clientX, e.clientY);
     if (!caret) return;
@@ -355,7 +409,9 @@ export default function PdfViewer({
     const ctx = findWordAndSentence(combined, prefix.length + start + caret.offset);
     if (!ctx) return;
     flashWord(caret.node, caret.offset);
-    onCollect(ctx);
+    // Record where in the book this word sits, so it can be sorted "in book" order
+    // later with no matching cost (we know the exact spot at click time).
+    onCollect(ctx, bookPosition(pageNum, start + caret.offset));
   }
 
   const slots = ready ? Array.from({ length: numPages }, (_, i) => i + 1) : [];

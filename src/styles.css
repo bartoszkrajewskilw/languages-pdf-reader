@@ -610,6 +610,33 @@ code {
   cursor: pointer;
 }
 
+/* Transient marker showing the sentence the audio landed on after a jump.
+   `multiply` keeps the underlying text readable through the yellow. One rect is
+   drawn per wrapped line, so it stays clean across a multi-line sentence. */
+.lw-flash {
+  position: absolute;
+  z-index: 5;
+  pointer-events: none;
+  border-radius: 2px;
+  background: #ffe27a;
+  mix-blend-mode: multiply;
+  animation: lw-flash 2.6s ease-out forwards;
+}
+@keyframes lw-flash {
+  0% {
+    opacity: 0;
+  }
+  8% {
+    opacity: 1;
+  }
+  75% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
 /* ---- Audio ---- */
 .audio {
   display: flex;
@@ -687,12 +714,53 @@ code {
   color: var(--danger);
 }
 .audio-now {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.audio-now-name {
+  flex: 1;
+  min-width: 0;
   font-size: 13px;
   font-weight: 600;
   color: var(--text);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+.audio-jump {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  color: var(--muted);
+}
+.audio-jump:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.audio-jump svg {
+  display: block;
+}
+.spinner {
+  flex: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 /* Confirm modal */
 .modal-overlay {
@@ -832,8 +900,31 @@ code {
   padding: 12px;
 }
 .word-panel h3 {
-  margin: 4px 0 12px;
+  margin: 0;
   font-size: 14px;
+}
+.word-panel-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 0 12px;
+}
+.word-panel-head h3 {
+  flex: 1;
+  min-width: 0;
+}
+.word-sort {
+  flex: none;
+  font-size: 12px;
+  color: var(--text);
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 3px 6px;
+  cursor: pointer;
+}
+.word-sort:hover {
+  border-color: var(--accent);
 }
 .word-list {
   list-style: none;
